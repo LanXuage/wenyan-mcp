@@ -1,0 +1,14 @@
+services:
+  wenyan-mcp:
+    image: wenyan-mcp:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wenyan-mcp
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - WECHAT_APP_ID=${WECHAT_APP_ID}
+      - WECHAT_APP_SECRET=${WECHAT_APP_SECRET}
+      - HOST_IMAGE_PATH=${HOST_IMAGE_PATH}
