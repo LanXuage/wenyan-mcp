@@ -9,8 +9,20 @@ import { Theme, themes } from "./theme.js";
 // @ts-ignore
 import { initMarkdownRenderer, renderMarkdown, handleFrontMatter } from "./main.js";
 import { publishToDraft } from "./publish.js";
+import fs from "fs";
+import util from "util";
+
+// 日志工具
+function log(...args: any[]) {
+    const msg = `[${new Date().toISOString()}] ${args.map(a => (typeof a === "string" ? a : util.inspect(a, { depth: 5 }))).join(" ")}`;
+    console.log(msg);
+    try {
+        fs.appendFileSync("wenyan-mcp.log", msg + "\n");
+    } catch (e) {}
+}
 
 initMarkdownRenderer();
+log("Markdown renderer initialized");
 
 // Map to store transports by session ID
 const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
@@ -20,17 +32,21 @@ const app = express();
 app.use(express.json());
 
 app.post('/mcp', async (req, res) => {
+    log("POST /mcp", { headers: req.headers, body: req.body });
     const sessionId = req.headers['mcp-session-id'] as string | undefined;
     let transport: StreamableHTTPServerTransport;
     let server: Server;
 
     if (sessionId && transports[sessionId]) {
+        log("Reusing session", sessionId);
         transport = transports[sessionId];
         server = servers[sessionId];
     } else if (!sessionId && isInitializeRequest(req.body)) {
+        log("Initializing new session");
         transport = new StreamableHTTPServerTransport({
             sessionIdGenerator: () => randomUUID(),
             onsessioninitialized: (sid) => {
+                log("Session initialized", sid);
                 transports[sid] = transport;
                 servers[sid] = server;
             },
@@ -48,8 +64,10 @@ app.post('/mcp', async (req, res) => {
                 },
             }
         );
-        // 注册工具等 handler
+        log("Server instance created");
+
         server.setRequestHandler(ListToolsRequestSchema, async () => {
+            log("ListToolsRequestSchema called");
             return {
                 tools: [
                     {
@@ -94,6 +112,7 @@ app.post('/mcp', async (req, res) => {
         });
 
         server.setRequestHandler(CallToolRequestSchema, async (request) => {
+            log("CallToolRequestSchema called", request.params?.name, request.params?.arguments);
             if (request.params.name === "publish_article") {
                 const content = String(request.params.arguments?.content || "");
                 const themeId = String(request.params.arguments?.theme_id || "");
@@ -109,23 +128,32 @@ app.post('/mcp', async (req, res) => {
                     }
                 }
                 if (!theme) {
+                    log("Invalid theme ID", themeId);
                     throw new Error("Invalid theme ID");
                 }
                 const preHandlerContent = handleFrontMatter(content);
+                log("FrontMatter handled", preHandlerContent);
                 const html = await renderMarkdown(preHandlerContent.body, theme.id);
+                log("Markdown rendered", { theme: theme.id, htmlLength: html.length });
                 const title = preHandlerContent.title ?? "this is title";
                 const cover = preHandlerContent.cover ?? "";
-                // 传递 appid 和 appsecret 给 publishToDraft
-                const response = await publishToDraft(title, html, cover, appid, appsecret);
-                return {
-                    content: [
-                        {
-                            type: "text",
-                            text: `Your article was successfully published to '公众号草稿箱'. The media ID is ${response.media_id}.`,
-                        },
-                    ],
-                };
+                try {
+                    const response = await publishToDraft(title, html, cover, appid, appsecret);
+                    log("Article published", { title, media_id: response.media_id });
+                    return {
+                        content: [
+                            {
+                                type: "text",
+                                text: `Your article was successfully published to '公众号草稿箱'. The media ID is ${response.media_id}.`,
+                            },
+                        ],
+                    };
+                } catch (err) {
+                    log("Publish error", err);
+                    throw err;
+                }
             } else if (request.params.name === "list_themes") {
+                log("Listing themes");
                 const themeResources = Object.entries(themes).map(([id, theme]) => ({
                     type: "text",
                     text: JSON.stringify({
@@ -138,20 +166,22 @@ app.post('/mcp', async (req, res) => {
                     content: themeResources,
                 };
             }
+            log("Unknown tool", request.params.name);
             throw new Error("Unknown tool");
         });
 
-        // 连接 MCP server
         await server.connect(transport);
+        log("Server connected to transport");
 
-        // 清理
         transport.onclose = () => {
+            log("Session closed", transport.sessionId);
             if (transport.sessionId) {
                 delete transports[transport.sessionId];
                 delete servers[transport.sessionId];
             }
         };
     } else {
+        log("Bad Request: No valid session ID provided", { headers: req.headers, body: req.body });
         res.status(400).json({
             jsonrpc: '2.0',
             error: {
@@ -163,22 +193,44 @@ app.post('/mcp', async (req, res) => {
         return;
     }
 
-    await transport.handleRequest(req, res, req.body);
+    try {
+        await transport.handleRequest(req, res, req.body);
+        log("Request handled successfully");
+    } catch (err) {
+        log("Request handling error", err);
+        res.status(500).json({
+            jsonrpc: '2.0',
+            error: {
+                code: -32001,
+                message: 'Internal server error',
+                data: String(err)
+            },
+            id: req.body?.id ?? null,
+        });
+    }
 });
 
 const handleSessionRequest = async (req: express.Request, res: express.Response) => {
+    log(`${req.method} /mcp`, { headers: req.headers });
     const sessionId = req.headers['mcp-session-id'] as string | undefined;
     if (!sessionId || !transports[sessionId]) {
+        log("Invalid or missing session ID", sessionId);
         res.status(400).send('Invalid or missing session ID');
         return;
     }
     const transport = transports[sessionId];
-    await transport.handleRequest(req, res);
+    try {
+        await transport.handleRequest(req, res);
+        log("Session request handled successfully");
+    } catch (err) {
+        log("Session request handling error", err);
+        res.status(500).send('Internal server error');
+    }
 };
 
 app.get('/mcp', handleSessionRequest);
 app.delete('/mcp', handleSessionRequest);
 
 app.listen(3000, () => {
-    console.log("MCP Server (HTTP+SSE) listening on port 3000");
+    log("MCP Server (HTTP+SSE) listening on port 3000");
 });
