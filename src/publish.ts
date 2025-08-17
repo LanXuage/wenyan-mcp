@@ -17,18 +17,14 @@ type UploadResponse = {
 };
 
 async function fetchAccessToken() {
-    try {
-        const response = await fetch(`${tokenUrl}?grant_type=client_credential&appid=${appId}&secret=${appSecret}`);
-        const data = await response.json();
-        if (data.access_token) {
-            return data;
-        } else if (data.errcode) {
-            throw new Error(`获取 Access Token 失败，错误码：${data.errcode}，${data.errmsg}`);
-        } else {
-            throw new Error(`获取 Access Token 失败: ${data}`);
-        }
-    } catch (error) {
-        throw error;
+    const response = await fetch(`${tokenUrl}?grant_type=client_credential&appid=${appId}&secret=${appSecret}`);
+    const data = await response.json();
+    if (data.access_token) {
+        return data;
+    } else if (data.errcode) {
+        throw new Error(`获取 Access Token 失败，错误码：${data.errcode}，${data.errmsg}`);
+    } else {
+        throw new Error(`获取 Access Token 失败: ${data}`);
     }
 }
 
@@ -104,43 +100,39 @@ async function uploadImages(content: string, accessToken: string): Promise<{ htm
 }
 
 export async function publishToDraft(title: string, content: string, cover: string) {
-    try {
-        const accessToken = await fetchAccessToken();
-        const { html, firstImageId } = await uploadImages(content, accessToken.access_token);
-        let thumbMediaId = "";
-        if (cover) {
-            const resp = await uploadImage(cover, accessToken.access_token, "cover.jpg");
+    const accessToken = await fetchAccessToken();
+    const { html, firstImageId } = await uploadImages(content, accessToken.access_token);
+    let thumbMediaId = "";
+    if (cover) {
+        const resp = await uploadImage(cover, accessToken.access_token, "cover.jpg");
+        thumbMediaId = resp.media_id;
+    } else {
+        if (firstImageId.startsWith("https://mmbiz.qpic.cn")) {
+            const resp = await uploadImage(firstImageId, accessToken.access_token, "cover.jpg");
             thumbMediaId = resp.media_id;
         } else {
-            if (firstImageId.startsWith("https://mmbiz.qpic.cn")) {
-                const resp = await uploadImage(firstImageId, accessToken.access_token, "cover.jpg");
-                thumbMediaId = resp.media_id;
-            } else {
-                thumbMediaId = firstImageId;
-            }
+            thumbMediaId = firstImageId;
         }
-        if (!thumbMediaId) {
-            throw new Error("你必须指定一张封面图或者在正文中至少出现一张图片。");
-        }
-        const response = await fetch(`${publishUrl}?access_token=${accessToken.access_token}`, {
-            method: 'POST',
-            body: JSON.stringify({
-                articles: [{
-                    title: title,
-                    content: html,
-                    thumb_media_id: thumbMediaId,
-                }]
-            })
-        });
-        const data = await response.json();
-        if (data.media_id) {
-            return data;
-        } else if (data.errcode) {
-            throw new Error(`上传到公众号草稿失败，错误码：${data.errcode}，${data.errmsg}`);
-        } else {
-            throw new Error(`上传到公众号草稿失败: ${data}`);
-        }
-    } catch (error) {
-        throw error;
+    }
+    if (!thumbMediaId) {
+        throw new Error("你必须指定一张封面图或者在正文中至少出现一张图片。");
+    }
+    const response = await fetch(`${publishUrl}?access_token=${accessToken.access_token}`, {
+        method: 'POST',
+        body: JSON.stringify({
+            articles: [{
+                title: title,
+                content: html,
+                thumb_media_id: thumbMediaId,
+            }]
+        })
+    });
+    const data = await response.json();
+    if (data.media_id) {
+        return data;
+    } else if (data.errcode) {
+        throw new Error(`上传到公众号草稿失败，错误码：${data.errcode}，${data.errmsg}`);
+    } else {
+        throw new Error(`上传到公众号草稿失败: ${data}`);
     }
 }
