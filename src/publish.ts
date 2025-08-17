@@ -6,8 +6,6 @@ import path from "path";
 const tokenUrl = "https://api.weixin.qq.com/cgi-bin/token";
 const publishUrl = "https://api.weixin.qq.com/cgi-bin/draft/add";
 const uploadUrl = `https://api.weixin.qq.com/cgi-bin/material/add_material`;
-const appId = process.env.WECHAT_APP_ID || "";
-const appSecret = process.env.WECHAT_APP_SECRET || "";
 const hostImagePath = process.env.HOST_IMAGE_PATH || "";
 const dockerImagePath = "/mnt/host-downloads";
 
@@ -16,8 +14,10 @@ type UploadResponse = {
     url: string
 };
 
-async function fetchAccessToken() {
-    const response = await fetch(`${tokenUrl}?grant_type=client_credential&appid=${appId}&secret=${appSecret}`);
+async function fetchAccessToken(appid?: string, appsecret?: string) {
+    const appIdToUse = appid || process.env.WECHAT_APP_ID || "";
+    const appSecretToUse = appsecret || process.env.WECHAT_APP_SECRET || "";
+    const response = await fetch(`${tokenUrl}?grant_type=client_credential&appid=${appIdToUse}&secret=${appSecretToUse}`);
     const data = await response.json();
     if (data.access_token) {
         return data;
@@ -99,8 +99,14 @@ async function uploadImages(content: string, accessToken: string): Promise<{ htm
     return { html: updatedHtml, firstImageId };
 }
 
-export async function publishToDraft(title: string, content: string, cover: string) {
-    const accessToken = await fetchAccessToken();
+export async function publishToDraft(
+    title: string,
+    content: string,
+    cover: string,
+    appid?: string,
+    appsecret?: string
+) {
+    const accessToken = await fetchAccessToken(appid, appsecret);
     const { html, firstImageId } = await uploadImages(content, accessToken.access_token);
     let thumbMediaId = "";
     if (cover) {

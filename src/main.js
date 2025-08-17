@@ -14,7 +14,7 @@ import { liteAdaptor } from 'mathjax-full/js/adaptors/liteAdaptor.js';
 import { RegisterHTMLHandler } from 'mathjax-full/js/handlers/html.js';
 import { AllPackages } from 'mathjax-full/js/input/tex/AllPackages.js';
 
-const serif =
+const _serif =
     "ui-serif, Georgia, Cambria, 'Noto Serif', 'Times New Roman', serif";
 const sansSerif =
     "ui-sans-serif, system-ui, 'Apple Color Emoji', 'Segoe UI', 'Segoe UI Symbol', 'Noto Sans', 'Roboto', sans-serif";
@@ -237,7 +237,7 @@ async function getContentForGzh(html, customCss, highlightCss, macStyleCss) {
 
     csstree.walk(ast, {
         visit: "Rule",
-        enter(node, item, list) {
+        enter(node, _item, _list) {
             const selectorList = node.prelude.children;
             if (selectorList) {
                 selectorList.forEach((selectorNode) => {

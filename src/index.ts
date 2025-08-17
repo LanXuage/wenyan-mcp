@@ -68,6 +68,14 @@ app.post('/mcp', async (req, res) => {
                                     description:
                                         "ID of the theme to use (e.g., default, orangeheart, rainbow, lapis, pie, maize, purple, phycat).",
                                 },
+                                appid: {
+                                    type: "string",
+                                    description: "The AppID for the WeChat Official Account.",
+                                },
+                                appsecret: {
+                                    type: "string",
+                                    description: "The AppSecret for the WeChat Official Account.",
+                                },
                             },
                             required: ["content"],
                         },
@@ -89,6 +97,8 @@ app.post('/mcp', async (req, res) => {
             if (request.params.name === "publish_article") {
                 const content = String(request.params.arguments?.content || "");
                 const themeId = String(request.params.arguments?.theme_id || "");
+                const appid = request.params.arguments?.appid as string | undefined;
+                const appsecret = request.params.arguments?.appsecret as string | undefined;
                 let theme: Theme | undefined = themes["default"];
                 if (themeId) {
                     theme = themes[themeId];
@@ -105,7 +115,8 @@ app.post('/mcp', async (req, res) => {
                 const html = await renderMarkdown(preHandlerContent.body, theme.id);
                 const title = preHandlerContent.title ?? "this is title";
                 const cover = preHandlerContent.cover ?? "";
-                const response = await publishToDraft(title, html, cover);
+                // 传递 appid 和 appsecret 给 publishToDraft
+                const response = await publishToDraft(title, html, cover, appid, appsecret);
                 return {
                     content: [
                         {
