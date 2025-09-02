@@ -18,7 +18,9 @@ function log(...args: any[]) {
     console.log(msg);
     try {
         fs.appendFileSync("wenyan-mcp.log", msg + "\n");
-    } catch (e) {}
+    } catch (e) {
+        console.log(`Failed to write to log file${e}`);
+    }
 }
 
 initMarkdownRenderer();

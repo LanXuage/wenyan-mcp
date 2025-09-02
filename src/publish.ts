@@ -22,7 +22,9 @@ function log(...args: any[]) {
     console.log(msg);
     try {
         fs.appendFileSync("wenyan-mcp.log", msg + "\n");
-    } catch (e) {}
+    } catch (e: unknown) {
+        console.log(`Failed to write to log file${e}`);
+    }
 }
 
 async function fetchAccessToken(appid?: string, appsecret?: string) {
@@ -59,7 +61,7 @@ async function uploadMaterial(type: string, fileData: Blob | File, fileName: str
     const data = await response.json();
     if (data.errcode) {
         log("Upload error", data);
-        throw new Error(`上传失败，错误码：${data.errcode}，错误信息：${data.errmsg}`);
+        throw new Error(`上传失败，错误码：${data.errcode}，错误信息：${data.errmsg}，链接：`);
     }
     const result = data.url.replace("http://", "https://");
     data.url = result;

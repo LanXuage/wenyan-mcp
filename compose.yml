@@ -9,6 +9,5 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - WECHAT_APP_ID=${WECHAT_APP_ID}
-      - WECHAT_APP_SECRET=${WECHAT_APP_SECRET}
-      - HOST_IMAGE_PATH=${HOST_IMAGE_PATH}
+      - WECHAT_APPID=${WECHAT_APPID}
+      - WECHAT_APPSECRET=${WECHAT_APPSECRET}
